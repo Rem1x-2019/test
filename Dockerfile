@@ -1,1 +1,1 @@
-FROM ghcr.io/eooce/python:latest
+FROM ygkkk/argosb:latest
