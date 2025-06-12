@@ -1,0 +1,31 @@
+version: "3.2"
+
+services:
+  enwaiax-x-ui:
+    image: enwaiax/x-ui
+    container_name: enwaiax-x-ui
+    ports:
+      - 8051:54321 # 管理面板端口映射
+      - 8100-8105:8100-8105/tcp
+      - 8100-8105:8100-8105/udp
+      - 443:443/tcp
+      - 443:443/udp
+     expose:
+      - "2000"
+      - "3000"
+    tmpfs:
+      - /tmp
+      - /run
+      - /run/lock
+    environment:
+      TZ: 'Asia/Shanghai'
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - ./x-ui-data/:/etc/x-ui
+      - ./ssl/:/root/cert/
+    restart: unless-stopped
+#    networks:
+#      - net_t_x_ui
+#
+#networks:
+#  net_t_x_ui:
