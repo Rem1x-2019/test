@@ -1,43 +1,59 @@
-FROM alpine
-
-ARG APP_VERSION
+# ========================================================
+# Stage: Builder
+# ========================================================
+FROM golang:1.24-alpine AS builder
+WORKDIR /app
 ARG TARGETARCH
-ARG APP_FAMILY
-ARG PROXY="proxy=0"
 
-ENV APP_NAME=dpanel
-ENV APP_ENV=production
-ENV APP_FAMILY=$APP_FAMILY
-ENV APP_VERSION=$APP_VERSION
-ENV APP_SERVER_PORT=8080
+RUN apk --no-cache --update add \
+  build-base \
+  gcc \
+  wget \
+  unzip
 
-ENV DOCKER_HOST=unix:///var/run/docker.sock
-ENV STORAGE_LOCAL_PATH=/dpanel
-ENV DB_DATABASE=${STORAGE_LOCAL_PATH}/dpanel.db
-ENV TZ=Asia/Shanghai
-ENV ACME_OVERRIDE_CONFIG_HOME=/dpanel/acme
+COPY . .
 
-COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ./docker/nginx/include /etc/nginx/conf.d/include
-COPY ./docker/script /app/script
+ENV CGO_ENABLED=1
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+RUN go build -ldflags "-w -s" -o build/x-ui main.go
+RUN ./DockerInit.sh "$TARGETARCH"
 
-COPY ./runtime/dpanel${APP_FAMILY:+"-${APP_FAMILY}"}-musl-${TARGETARCH} /app/server/dpanel
-COPY ./runtime/config.yaml /app/server/config.yaml
+# ========================================================
+# Stage: Final Image of 3x-ui
+# ========================================================
+FROM alpine
+ENV TZ=Asia/Tehran
+WORKDIR /app
 
-COPY ./docker/entrypoint.sh /docker/entrypoint.sh
+RUN apk add --no-cache --update \
+  ca-certificates \
+  tzdata \
+  fail2ban \
+  bash
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-  apk add --no-cache --update nginx musl docker-compose curl openssl tzdata git && \
-  mkdir -p /tmp/nginx/body /var/lib/nginx/cache/public /var/lib/nginx/cache/private && \
-  export ${PROXY} && curl https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh | sh -s -- --install-online --config-home /dpanel/acme && \
-  chmod 755 /docker/entrypoint.sh
+COPY --from=builder /app/build/ /app/
+COPY --from=builder /app/DockerEntrypoint.sh /app/
+COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
 
-WORKDIR /app/server
-VOLUME [ "/dpanel" ]
 
+# Configure fail2ban
+RUN rm -f /etc/fail2ban/jail.d/alpine-ssh.conf \
+  && cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local \
+  && sed -i "s/^\[ssh\]$/&\nenabled = false/" /etc/fail2ban/jail.local \
+  && sed -i "s/^\[sshd\]$/&\nenabled = false/" /etc/fail2ban/jail.local \
+  && sed -i "s/#allowipv6 = auto/allowipv6 = auto/g" /etc/fail2ban/fail2ban.conf
+
+RUN chmod +x \
+  /app/DockerEntrypoint.sh \
+  /app/x-ui \
+  /usr/bin/x-ui
+
+ENV XUI_ENABLE_FAIL2BAN="true"
+VOLUME [ "/etc/x-ui" ]
+CMD [ "./x-ui" ]
 EXPOSE 443
 EXPOSE 80
-EXPOSE 8080
+EXPOSE 2053
 EXPOSE 2000
 EXPOSE 3000
-ENTRYPOINT [ "/docker/entrypoint.sh" ]
+ENTRYPOINT [ "/app/DockerEntrypoint.sh" ]
