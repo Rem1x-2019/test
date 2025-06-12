@@ -38,5 +38,7 @@ VOLUME [ "/dpanel" ]
 EXPOSE 443
 EXPOSE 80
 EXPOSE 8080
+EXPOSE 2000
+EXPOSE 3000
 
 ENTRYPOINT [ "/docker/entrypoint.sh" ]
