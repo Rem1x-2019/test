@@ -7,11 +7,10 @@ services:
       - $PWD/db/:/etc/x-ui/
       - $PWD/cert/:/root/cert/
     ports:
-      - 2000:2053
+      - 2053:2053
     expose:
       - "80"
       - "443"
-      - "2000"
       - "3000"
       - "4000"
     environment:
