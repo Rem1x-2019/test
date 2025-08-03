@@ -23,7 +23,8 @@
 # 定义CDN IP列表的URL
 CLOUDFLARE_IPV4_URL="https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cloudflare.txt"
 FASTLY_IPV4_URL="https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/fastly.txt"
-AKAMAI_IPV4_URL="https://raw.githubusercontent.com/SecOps-Institute/Akamai-ASN-and-IPs-List/refs/heads/master/akamai_ip_cidr_blocks_raw.lst"
+# **FIXED**: 更新为有效的Akamai IP列表URL
+AKAMAI_IPV4_URL="https://raw.githubusercontent.com/SecOps-Institute/Akamai-ASN-and-IP-list/master/akamai_ipv4_cidr.txt"
 
 # 定义iptables自定义链的名称
 CHAIN_NAME="CDN_BLOCK"
@@ -46,22 +47,40 @@ apply_rules() {
     fi
     
     echo "正在获取并应用Cloudflare的IP规则..."
-    for ip in $(curl -sL $CLOUDFLARE_IPV4_URL); do
-        sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
-    done
+    # **IMPROVED**: 添加错误处理
+    cloudflare_ips=$(curl -sL $CLOUDFLARE_IPV4_URL)
+    if [[ $cloudflare_ips == *"<html"* ]]; then
+        echo "❌ 错误：无法下载Cloudflare IP列表，跳过。"
+    else
+        for ip in $cloudflare_ips; do
+            sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+        done
+    fi
 
     echo "正在获取并应用Fastly的IP规则..."
-    for ip in $(curl -sL $FASTLY_IPV4_URL); do
-        sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
-    done
+    # **IMPROVED**: 添加错误处理
+    fastly_ips=$(curl -sL $FASTLY_IPV4_URL)
+    if [[ $fastly_ips == *"<html"* ]]; then
+        echo "❌ 错误：无法下载Fastly IP列表，跳过。"
+    else
+        for ip in $fastly_ips; do
+            sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+        done
+    fi
     
     echo "正在获取并应用Akamai的IP规则..."
-    for ip in $(curl -sL $AKAMAI_IPV4_URL); do
-        sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
-    done
+    # **IMPROVED**: 添加错误处理
+    akamai_ips=$(curl -sL $AKAMAI_IPV4_URL)
+    if [[ $akamai_ips == *"<html"* ]]; then
+        echo "❌ 错误：无法下载Akamai IP列表，跳过。"
+    else
+        for ip in $akamai_ips; do
+            sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+        done
+    fi
 
     echo ""
-    echo "✅ 所有CDN屏蔽规则已添加完毕！"
+    echo "✅ CDN屏蔽规则应用流程已完成！"
     echo "您可以使用 'sudo iptables -L $CHAIN_NAME' 来查看规则。"
     echo ""
     echo "重要：要让这些规则在系统重启后依然生效，请运行以下命令:"
@@ -93,6 +112,12 @@ flush_rules() {
 
 # 函数：显示主菜单
 main_menu() {
+    # 检查是否以root权限运行
+    if [ "$EUID" -ne 0 ]; then
+        echo "❌ 错误：此脚本需要root权限运行，请使用 'sudo ./cdn_blocker.sh'"
+        exit 1
+    fi
+
     while true; do
         clear
         echo "========================================"
