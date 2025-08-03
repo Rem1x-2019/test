@@ -23,7 +23,6 @@
 # 定义CDN IP列表的URL
 CLOUDFLARE_IPV4_URL="https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/cloudflare.txt"
 FASTLY_IPV4_URL="https://github.com/Loyalsoldier/geoip/raw/refs/heads/release/text/fastly.txt"
-# **FIXED**: 更新为有效的Akamai IP列表URL
 AKAMAI_IPV4_URL="https://raw.githubusercontent.com/SecOps-Institute/Akamai-ASN-and-IP-list/master/akamai_ipv4_cidr.txt"
 
 # 定义iptables自定义链的名称
@@ -47,35 +46,41 @@ apply_rules() {
     fi
     
     echo "正在获取并应用Cloudflare的IP规则..."
-    # **IMPROVED**: 添加错误处理
     cloudflare_ips=$(curl -sL $CLOUDFLARE_IPV4_URL)
     if [[ $cloudflare_ips == *"<html"* ]]; then
         echo "❌ 错误：无法下载Cloudflare IP列表，跳过。"
     else
         for ip in $cloudflare_ips; do
-            sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+            # **FIXED**: 只处理IPv4地址 (包含'.')
+            if [[ $ip == *"."* ]]; then
+                sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+            fi
         done
     fi
 
     echo "正在获取并应用Fastly的IP规则..."
-    # **IMPROVED**: 添加错误处理
     fastly_ips=$(curl -sL $FASTLY_IPV4_URL)
     if [[ $fastly_ips == *"<html"* ]]; then
         echo "❌ 错误：无法下载Fastly IP列表，跳过。"
     else
         for ip in $fastly_ips; do
-            sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+            # **FIXED**: 只处理IPv4地址 (包含'.')
+            if [[ $ip == *"."* ]]; then
+                sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+            fi
         done
     fi
     
     echo "正在获取并应用Akamai的IP规则..."
-    # **IMPROVED**: 添加错误处理
     akamai_ips=$(curl -sL $AKAMAI_IPV4_URL)
     if [[ $akamai_ips == *"<html"* ]]; then
         echo "❌ 错误：无法下载Akamai IP列表，跳过。"
     else
         for ip in $akamai_ips; do
-            sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+            # **FIXED**: 只处理IPv4地址 (包含'.')
+            if [[ $ip == *"."* ]]; then
+                sudo iptables -A $CHAIN_NAME -p all -d $ip -j DROP
+            fi
         done
     fi
 
